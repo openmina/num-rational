@@ -55,6 +55,14 @@ pub struct Ratio<T> {
     denom: T,
 }
 
+#[cfg(feature = "num-bigint")]
+impl<const N: usize> Ratio<BigInt<N>> {
+    pub fn to_nlimbs<const B: usize>(&self) -> Ratio<BigInt<B>> {
+        let Self { numer, denom } = self;
+        Ratio::new(numer.to_nlimbs(), denom.to_nlimbs())
+    }
+}
+
 /// Alias for a `Ratio` of machine-sized integers.
 #[deprecated(
     since = "0.4.0",
@@ -68,7 +76,7 @@ pub type Rational64 = Ratio<i64>;
 
 #[cfg(feature = "num-bigint")]
 /// Alias for arbitrary precision rationals.
-pub type BigRational = Ratio<BigInt>;
+pub type BigRational<const N: usize = { num_bigint::NLIMBS }> = Ratio<BigInt<N>>;
 
 /// These method are `const`.
 impl<T> Ratio<T> {
@@ -1520,8 +1528,8 @@ impl<T: Clone + Integer + ToPrimitive + ToBigInt> ToPrimitive for Ratio<T> {
                 <i128 as From<_>>::from(denom),
             ),
             _ => {
-                let numer: BigInt = self.numer.to_bigint()?;
-                let denom: BigInt = self.denom.to_bigint()?;
+                let numer: BigInt<32> = self.numer.to_bigint()?;
+                let denom: BigInt<32> = self.denom.to_bigint()?;
                 ratio_to_f64(numer, denom)
             }
         };
@@ -1539,6 +1547,13 @@ trait Bits {
 
 #[cfg(feature = "num-bigint")]
 impl Bits for BigInt {
+    fn bits(&self) -> u64 {
+        self.bits()
+    }
+}
+
+#[cfg(feature = "num-bigint")]
+impl Bits for BigInt<32> {
     fn bits(&self) -> u64 {
         self.bits()
     }
@@ -2745,7 +2760,7 @@ mod test {
 
         #[cfg(feature = "num-bigint")]
         fn test_big(r: Rational64, e: i32, expected: Rational64) {
-            let r = BigRational::new_raw(r.numer.into(), r.denom.into());
+            let r = BigRational::<4>::new_raw(r.numer.into(), r.denom.into());
             let expected = BigRational::new_raw(expected.numer.into(), expected.denom.into());
             assert_eq!((&r).pow(e), expected);
             assert_eq!(Pow::pow(r.clone(), e), expected);
@@ -3016,16 +3031,17 @@ mod test {
     #[cfg(feature = "num-bigint")]
     fn test_big_ratio_to_f64() {
         assert_eq!(
-            BigRational::new(
+            BigRational::<4>::new(
                 "1234567890987654321234567890987654321234567890"
                     .parse()
                     .unwrap(),
                 "3".parse().unwrap()
             )
+            .to_nlimbs::<32>()
             .to_f64(),
             Some(411522630329218100000000000000000000000000000f64)
         );
-        assert_eq!(Ratio::from_float(5e-324).unwrap().to_f64(), Some(5e-324));
+        assert_eq!(Ratio::from_float(5e-324).unwrap().to_nlimbs::<32>().to_f64(), Some(5e-324));
         assert_eq!(
             // subnormal
             BigRational::new(BigInt::one(), BigInt::one() << 1050).to_f64(),
@@ -3045,10 +3061,11 @@ mod test {
             Some(core::f64::NEG_INFINITY)
         );
         assert_eq!(
-            BigRational::new(
+            BigRational::<4>::new(
                 "1234567890987654321234567890".parse().unwrap(),
                 "987654321234567890987654321".parse().unwrap()
             )
+            .to_nlimbs::<32>()
             .to_f64(),
             Some(1.2499999893125f64)
         );
