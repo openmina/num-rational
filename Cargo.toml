@@ -24,7 +24,7 @@ optional = true
 # git = "https://github.com/openmina/num-bigint.git"
 # branch = "on-stack"
 # path = "/home/sebastien/github/num-bigint"
-version = "0.4.0"
+version = "0.4.4"
 default-features = false
 
 [dependencies.num-integer]
